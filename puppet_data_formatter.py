@@ -14,6 +14,14 @@
 # and so on. Virtual devices (which can be determined via symlink) should not have BMCs.
 import os
 import yaml
+import sys
+#convert the file names to the actual property name
+YAML_TO_PROPERTIES = {
+    "centos_7.yaml": "centos_7",
+    "centos_8_stream.yaml": "centos_8",
+    "centos_9_stream.yaml": "centos_9",
+    "centos.yaml" : "centos - This is the base yaml, this shouldn\'t happen",
+}
 
 def preprocess_yaml_content(content):
     # Replace tabs with 4 spaces
@@ -24,7 +32,7 @@ def preprocess_yaml_content(content):
     
     return content
 
-def find_info(data): #TODO: this only works for centos 8/9
+def find_nodefile_info(data): #TODO: this only works for centos 8/9
     hostname = None
     network_hostname = None
     bmc_address = None
@@ -71,29 +79,50 @@ def find_info(data): #TODO: this only works for centos 8/9
                 interfaces.append(interface_info)
     return hostname, network_hostname, bmc_address, interfaces
 
+#this gets the chassis for the node and if it is a vm 
+def get_node_chassis_and_vm(node_chassis_path:str) -> (str, bool):
+    templatename = os.path.basename(os.path.realpath(node_chassis_path))
+    #not using YAML_TO_PROPERTIES b/c the chassis yaml names should hopefully match (this may change)
+    return (os.path.splitext(templatename)[0], templatename == 'kvm_guest.yaml')
 
-def load_yaml_files(directory):
+#given the path to a node in os_tier_1, return the centos version of the node
+def get_node_os(node_os_path:str) -> str:
+    templatename = os.path.basename(os.path.realpath(node_os_path)) #extract the file name
+
+    if templatename not in YAML_TO_PROPERTIES:
+        print(f'Unknown OS template name {templatename} for node {node_os_path}') #don't know why this ever gets printed out
+        return None
+    return YAML_TO_PROPERTIES[templatename]
+
+def load_yaml_files(puppet_data_path):
     nodes_data = {}
-    for filename in os.listdir(directory):
+    for filename in os.listdir(os.path.join(puppet_data_path, 'node')):
         
         #only parse config files
         if filename.endswith(".yaml"):
-            filepath = os.path.join(directory, filename)
+            filepath = os.path.join(puppet_data_path, 'node', filename)
 
+            #open, process, and parse nodefiles
             with open(filepath, 'r') as stream:
                 content = stream.read()
                 content = preprocess_yaml_content(content)
                 try:
                     data = yaml.safe_load(content)
-                    hostname, network_hostname, bmc_address, interfaces = find_info(data)
-                    nodes_data[filename] = {
+                    hostname, network_hostname, bmc_address, interfaces = find_nodefile_info(data)
+                    nodes_data[filename] = {  #TODO: entries should be created even if yaml.safe_load of find_nodefile_info fails
                         'hostname': hostname,
                         'network_hostname': network_hostname,
                         'bmc_address': bmc_address,
                         'interfaces': interfaces
                     }
+
+                    nodes_data[filename]['chassis'], nodes_data[filename]['isVM'] = get_node_chassis_and_vm(os.path.join(puppet_data_path, 'chassis', filename)) #this should be in the outside loop, but sometimes the entry for the host is not created
+
+                    nodes_data[filename]['os_version'] = get_node_os(os.path.join(puppet_data_path, 'os_tier_1', filename))
                 except yaml.YAMLError as e:
-                    print(f"Error parsing YAML file {filepath}: {e}")    
+                    print(f"Error parsing YAML file {filepath}: {e}")
+
+
     return nodes_data
 
 
@@ -134,9 +163,26 @@ def perform_parity_checks(nodes_data):
 
     return failed_checks
 
+def puppet_data_to_dict(puppet_data_path:str = "../puppet_data") -> dict:
+    puppet_data_path = os.path.join(puppet_data_path, 'node')
+    return load_yaml_files(puppet_data_path)
 
-directory = '../puppet_data/node/'
-nodes_data = load_yaml_files(directory)
+
+
+puppet_data_path = '../puppet_data'
+
+#run this if called through command line
+if len(sys.argv) == 1:
+    pass
+elif len(sys.argv) == 2:
+    if sys.argv[1] == '-h' or sys.argv[1] == '--help':
+        print('Usage: python3 puppet_data.py [path_to_puppet_data]')
+        print('This script loads the json files in the puppet_data repository into a dictionary')
+        sys.exit(0)
+    else:
+        puppet_data_path = sys.argv[1]
+# Running this file with no args will run the parity checks
+nodes_data = load_yaml_files(puppet_data_path)
 parity_check_results = perform_parity_checks(nodes_data)
 if parity_check_results:
     print("Parity Check Failures:")

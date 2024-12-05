@@ -4,11 +4,6 @@ import os
 import pprint
 import sys
 
-if len(sys.argv) != 1:
-    print('Usage: python cobbler_data.py')
-    print('This script copies cobbler_objects from cobbler.chtc.wisc.edu and loads the json files into a dictionary')
-    sys.exit(1)
-
 
 #copies the cobbler_objects directory from cobbler.chtc.wisc.edu
 def get_cobbler_objects():
@@ -38,11 +33,12 @@ def cobbler_to_dict(redownload_files:bool=False) -> dict:
                 data = json.load(f)
                 db[file] = data
                 if file.removesuffix('.json') != data['hostname']:
-                    print(f'{file} does not match {data["hostname"]}')                
+                    print(f'Filename "{file}" does not match hostname entry "{data["hostname"]}"') #TODO: return this data more intelligently?
+                else:
+                    print(f'Loaded {file} into dictionary')              
         else:
             print(f'{file} is not a json file')
 
-    pprint.pprint(db[next(iter(db))])
     return db
 
 #example entry looks like this:
@@ -120,4 +116,14 @@ def cobbler_to_dict(redownload_files:bool=False) -> dict:
  'virt_ram': '<<inherit>>',
  'virt_type': 'xenpv'}
 """
+#call the functions if this script is run directly
 
+
+if len(sys.argv) != 1:
+    print('Usage: python3 cobbler_data.py')
+    print('This script copies cobbler_objects from cobbler.chtc.wisc.edu and loads the json files into a dictionary')
+    sys.exit(1)
+
+
+db = cobbler_to_dict()
+pprint.pprint(db[next(iter(db))])

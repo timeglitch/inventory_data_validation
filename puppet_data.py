@@ -1,4 +1,8 @@
+#DEAD FILE: this file is no longer used, use puppet_data_formatter.py instead
+#it's just here for reference
+
 #This files gathers data from puppet and puts it into a dictionary
+
 
 import yaml
 import os

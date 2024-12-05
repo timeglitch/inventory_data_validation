@@ -24,11 +24,12 @@ def preprocess_yaml_content(content):
     
     return content
 
-def find_info(data):
+def find_info(data): #TODO: this only works for centos 8/9
     hostname = None
     network_hostname = None
     bmc_address = None
     interfaces = []
+
     if 'bmc' in data and 'lan' in data['bmc'] and 'ip_address' in data['bmc']['lan']:
         bmc_address = data['bmc']['lan']['ip_address']
     
@@ -74,8 +75,11 @@ def find_info(data):
 def load_yaml_files(directory):
     nodes_data = {}
     for filename in os.listdir(directory):
+        
+        #only parse config files
         if filename.endswith(".yaml"):
             filepath = os.path.join(directory, filename)
+
             with open(filepath, 'r') as stream:
                 content = stream.read()
                 content = preprocess_yaml_content(content)

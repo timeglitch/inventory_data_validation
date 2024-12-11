@@ -121,8 +121,6 @@ def load_yaml_files(puppet_data_path):
                     nodes_data[filename]['os_version'] = get_node_os(os.path.join(puppet_data_path, 'os_tier_1', filename))
                 except yaml.YAMLError as e:
                     print(f"Error parsing YAML file {filepath}: {e}")
-
-
     return nodes_data
 
 
@@ -163,8 +161,7 @@ def perform_parity_checks(nodes_data):
 
     return failed_checks
 
-def puppet_data_to_dict(puppet_data_path:str = "../puppet_data") -> dict:
-    puppet_data_path = os.path.join(puppet_data_path, 'node')
+def puppet_to_dict(puppet_data_path:str = "../puppet_data") -> dict:
     return load_yaml_files(puppet_data_path)
 
 

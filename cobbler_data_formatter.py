@@ -14,6 +14,43 @@ if not os.path.exists('cobbler_objects'):
 
 #TODO: maybe rsync to make sure the files are up to date?
 
+def profile_to_os(profile:str) -> str:
+    if 'CentOS_7' in profile:
+        return "centos_7"
+    elif 'CentOS_8' in profile:
+        return "centos_8"
+    elif 'CentOS_9' in profile:
+        return "centos_9"
+    else:
+        print(f"Unknown OS for Cobbler profile {profile}") #Debug statement
+        return f"Unknown OS for Cobbler profile {profile}"
+
+#pass in the loaded json, returns (ip_address, netmask, gateway, mac_address)
+def get_networking_info(data:dict) -> (str, str, str, str):
+
+    if len(data['interfaces']) == 0:
+        return ("", "", "", "")
+    elif len(data['interfaces']) > 1:
+        ifkey = list(data['interfaces'].keys())[0]
+    else:
+        #search through valid keynames that I see
+        # collected list: {'ib0': 484, 'em1': 132, 'eth0': 1024, 'bond0': 41, 'eth1': 52, 'eth2': 2, 'em0': 1, 'em2': 1, 'enp175s0f1': 1, 'mgmt0': 2, 'mgm0': 1}
+        if 'eth0' in data['interfaces']:
+            ifkey = "eth0"
+        elif 'ib0' in data['interfaces']:
+            ifkey = "ib0"
+        elif 'em1' in data['interfaces']:
+            ifkey = "em1"
+        else:
+            return ("", "", "", "")
+    #proceed if we have a valid ifkey
+    return (data['interfaces'][ifkey]['ip_address'], 
+            data['interfaces'][ifkey]['netmask'], 
+            data['interfaces'][ifkey]['if_gateway'], 
+            data['interfaces'][ifkey]['mac_address'])
+
+
+
 #requires the cobbler_objects directory to exist
 #returns a dictionary of the json files in cobbler_objects
 #redownload_files: if True, will re-download the files from cobbler.chtc.wisc.edu
@@ -30,15 +67,38 @@ def cobbler_to_dict(redownload_files:bool=False) -> dict:
     for file in files:
         if file.endswith('.json'):
             with open(f'cobbler_objects/{file}', 'r') as f:
-                data = json.load(f)
-                db[file] = data
-                if file.removesuffix('.json') != data['hostname']:
-                    print(f'Filename "{file}" does not match hostname entry "{data["hostname"]}"') #TODO: return this data more intelligently?
-                else:
-                    print(f'Loaded {file} into dictionary')              
+                try:
+                    # we load the json file, then extract only relevant information into db[hostname]
+                    data = json.load(f)
+                    hostname = data['hostname'] #The key for a node should be its hostname
+                    if file.removesuffix('.json') != data['hostname']:
+                        print(f'Filename "{file}" does not match hostname entry "{data["hostname"]}"') #TODO: return this data more intelligently?
+                    else:
+                        print(f'Loaded {file} into dictionary')
+                    db[hostname] = {}
+                    db[hostname]["profile"] = data['profile']
+                    db[hostname]["os_version"] = profile_to_os(data['profile'])
+
+                    db[hostname]["ipv4_address"], db[hostname]["netmask"], db[hostname]["gateway"], db[hostname]["mac_address"] = get_networking_info(data) 
+
+
+                    
+                except json.JSONDecodeError as e:
+                    print(f'JSONDecodeError loading {file}: {e}')
+                # except KeyError as e:
+                #     print(f'KeyError loading {file}: {e}')
+                # except Exception as e:
+                #     print(f'Error loading {file}: {e}')
+
+                # This is previous code that just loaded the information directly
+                # data = json.load(f)
+                # db[file] = data
+                # if file.removesuffix('.json') != data['hostname']:
+                #     print(f'Filename "{file}" does not match hostname entry "{data["hostname"]}"') #TODO: return this data more intelligently?
+                # else:
+                #     print(f'Loaded {file} into dictionary')              
         else:
             print(f'{file} is not a json file')
-
     return db
 
 #example entry looks like this:

@@ -94,18 +94,20 @@ def read_puppet_data(puppet_data_path:str = "../puppet_data") -> dict:
     for count, node in enumerate(nodes):
 
         print(f'Loading node {node: <60} \t({count}/{numnodes})\r', flush=True, end='')
-        db[node] = {} #initialize the node 
-        db[node]["hostname"] = node #TODO: get the hostname from the nodefile
+        nodename = node.sptrip('.yaml')
+        db[nodename] = {} #initialize the node 
+        db[nodename]["hostname"] = node #TODO: get the hostname from the nodefile
 
 
-        db[node]["os_version"] = get_node_os(os.path.join(puppet_data_path, 'os_tier_1', node)) #getting the os first b/c nodefiles format depend on it
-        db[node]["chassis"], db[node]["isVM"] = get_node_chassis_and_vm(os.path.join(puppet_data_path, 'chassis', node)) #set the chassis and vm value
+        db[nodename]["os_version"] = get_node_os(os.path.join(puppet_data_path, 'os_tier_1', node)) #getting the os first b/c nodefiles format depend on it
+        db[nodename]["chassis"], db[nodename]["isVM"] = get_node_chassis_and_vm(os.path.join(puppet_data_path, 'chassis', node)) #set the chassis and vm value
 
         #this is temporary
-        tmp = read_nodefile(os.path.join(puppet_data_path, 'node', node), db[node]["os_version"])
-        db[node]["nodefile"] = tmp
+        tmp = read_nodefile(os.path.join(puppet_data_path, 'node', node), db[nodename]["os_version"])
+        db[nodename]["nodefile"] = tmp
 
-        #db[node]["ipv4_address"], db[node]["netmask"], db[node]["gateway"],  = tmp
+        #db[nodename]["ipv4_address"], db[nodename]["netmask"], db[nodename]["gateway"],  = tmp
+
     centos7examples = """e474.chtc.wisc.edu.yaml
                     e2288.chtc.wisc.edu.yaml
                     e2363.chtc.wisc.edu.yaml

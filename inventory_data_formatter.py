@@ -6,8 +6,8 @@ asset_data_path = "../asset_data"
 
 #Couldn't figure out how to import yaml_io so I'm just manually reading the yamls
 
-
-def preprocess_yaml_content(content):
+#replaces invalid characters in the yaml files with valid ones
+def preprocess_yaml_content(content: str) -> str:
     # Replace tabs with 4 spaces
     content = content.replace('\t', '    ')
     # Handle improperly escaped single quotes in double-quoted scalars

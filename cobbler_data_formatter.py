@@ -50,7 +50,7 @@ def get_networking_info(data:dict) -> (str, str, str, str):
     return (data['interfaces'][ifkey]['ip_address'], 
             data['interfaces'][ifkey]['netmask'], 
             data['interfaces'][ifkey]['if_gateway'], 
-            data['interfaces'][ifkey]['mac_address'])
+            data['interfaces'][ifkey]['mac_address'].upper())
 
 
 
@@ -190,4 +190,5 @@ if __name__ == "__main__":
         print('This script copies cobbler_objects from cobbler.chtc.wisc.edu and loads the json files into a dictionary')
         sys.exit(1)
     db = cobbler_to_dict()
-    pprint.pprint(db[next(iter(db))])
+    pprint.pprint(db) #print everything
+    #pprint.pprint(db[next(iter(db))]) #print the first entry in the dictionary

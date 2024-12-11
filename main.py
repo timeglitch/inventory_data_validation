@@ -4,6 +4,12 @@ import cobbler_data_formatter
 import puppet_data_formatter
 import inventory_data_formatter
 
+try:
+    import tabulate
+except ImportError:
+    print("Please install tabulate with 'pip install tabulate'")
+    exit(1)
+
 def main():
     cobbler_db = cobbler_data_formatter.cobbler_to_dict()
     puppet_db = puppet_data_formatter.puppet_to_dict()
@@ -20,22 +26,37 @@ def main():
     print(f"Num hosts in puppet but not cobbler or inventory: {len(puppet_hosts - cobbler_hosts - inventory_hosts)}")
     print(f"Num hosts in inventory but not cobbler or puppet: {len(inventory_hosts - cobbler_hosts - puppet_hosts)}")
 
+    puppet_cobbler_ipv4_mismatch = []
     print("Puppet and Cobbler IPv4 Mismatch:")
     for host in puppet_hosts & cobbler_hosts:
-        if puppet_db[host]['ip_address'] != cobbler_db[host]['ip_address']:
-            print(f"{host}: puppet {puppet_db[host]['ip_address']} cobbler {cobbler_db[host]['ip_address']}")
+        if puppet_db[host]['ipv4_address'] != cobbler_db[host]['ipv4_address']:
+            puppet_cobbler_ipv4_mismatch.append([host, puppet_db[host]['ipv4_address'], cobbler_db[host]['ipv4_address']])
+            #print(f"{host}: puppet {puppet_db[host]['ipv4_address']} cobbler {cobbler_db[host]['ipv4_address']}")
+    print(tabulate.tabulate(puppet_cobbler_ipv4_mismatch, headers=["Host", "Puppet IPv4", "Cobbler IPv4"]))
 
+    puppet_cobbler_mac_mismatch = []
     print("Puppet and Cobbler MAC Mismatch:")
     for host in puppet_hosts & cobbler_hosts:
         if puppet_db[host]['mac_address'] != cobbler_db[host]['mac_address']:
-            print(f"{host}: puppet {puppet_db[host]['mac_address']} cobbler {cobbler_db[host]['mac_address']}")
+            puppet_cobbler_mac_mismatch.append([host, puppet_db[host]['mac_address'], cobbler_db[host]['mac_address']])
+            #print(f"{host}: puppet {puppet_db[host]['mac_address']} cobbler {cobbler_db[host]['mac_address']}")
+    print(tabulate.tabulate(puppet_cobbler_mac_mismatch, headers=["Host", "Puppet MAC", "Cobbler MAC"]))
 
     print("Puppet and Cobbler OS Mismatch:")
+    puppet_cobbler_os_mismatch = []
     for host in puppet_hosts & cobbler_hosts:
-        if puppet_db[host]['os'] != cobbler_db[host]['os']:
-            print(f"{host}: puppet {puppet_db[host]['os']} cobbler {cobbler_db[host]['os']}")
+        if puppet_db[host]['os_version'] != cobbler_db[host]['os_version']:
+            puppet_cobbler_os_mismatch.append([host, puppet_db[host]['os_version'], cobbler_db[host]['os_version']])
+            #print(f"{host}\t{puppet_db[host]['os_version']}\t{cobbler_db[host]['os_version']}")
+    print(tabulate.tabulate(puppet_cobbler_os_mismatch, headers=["Host", "Puppet Version", "Cobbler Version"]))
 
     #print(f"Hosts existing only in Cobbler:{sorted(cobbler_hosts - puppet_hosts - inventory_hosts)}") #example
+    #print(f"Hosts existing only in Puppet:{sorted(puppet_hosts - cobbler_hosts - inventory_hosts)}")
+
+    print("Mismatch summary:")
+    print(f"IPv4 Mismatch: {len(puppet_cobbler_ipv4_mismatch)} / {len(puppet_hosts & cobbler_hosts)}")
+    print(f"MAC Mismatch: {len(puppet_cobbler_mac_mismatch)} / {len(puppet_hosts & cobbler_hosts)}")
+    print(f"OS Mismatch: {len(puppet_cobbler_os_mismatch)} / {len(puppet_hosts & cobbler_hosts)}")
 
     
     

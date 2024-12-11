@@ -15,6 +15,8 @@
 import os
 import yaml
 import sys
+import pprint
+from typing import Tuple
 #convert the file names to the actual property name
 YAML_TO_PROPERTIES = {
     "centos_7.yaml": "centos_7",
@@ -23,62 +25,81 @@ YAML_TO_PROPERTIES = {
     "centos.yaml" : "centos - This is the base yaml, this shouldn\'t happen",
 }
 
-def preprocess_yaml_content(content):
+def preprocess_yaml_content(content: str) -> str:
     # Replace tabs with 4 spaces
     content = content.replace('\t', '    ')
     # Handle improperly escaped single quotes in double-quoted scalars
     content = content.replace("\\'", "'")
     return content
 
-def find_nodefile_info(data): #TODO: this only works for centos 8/9
+from typing import List
+
+#this function takes the dict of a nodefile and extracts the hostname, network hostname, bmc address, and interfaces
+#interfaces are returned in a dict with key = interface name (e.g. eth0) and value = dict of HWADDR, IPADDR, IPV6ADDR
+def find_nodefile_info(data: dict, os_version: str) -> Tuple[str, str, str, dict]: #this function is super ugly, maybe refactor
     hostname = None
     network_hostname = None
     bmc_address = None
-    interfaces = []
+    interfaces = {}
 
-    if 'bmc' in data and 'lan' in data['bmc'] and 'ip_address' in data['bmc']['lan']:
-        bmc_address = data['bmc']['lan']['ip_address']
-    
-    if 'file' in data:
-        if '/etc/hostname' in data['file'] and 'content' in data['file']['/etc/hostname']:
-            hostname_content = data['file']['/etc/hostname']['content']
-            for key, value in hostname_content.items():
-                if isinstance(value, dict):
-                    for host, flag in value.items():
-                        if flag:  # Check if it's set to True
-                            hostname = host
-        if '/etc/sysconfig/network' in data['file'] and 'content' in data['file']['/etc/sysconfig/network']:
-            network_content = data['file']['/etc/sysconfig/network']['content']
-            for key, value in network_content.items():
-                if isinstance(value, dict):
-                    for network_config, flag in value.items():
-                        if flag and network_config.startswith("HOSTNAME="):
-                            network_hostname = network_config.split('=')[1]
+    if os_version == 'centos_7':
+        # print("CentOS 7 data['network']")
+        # pprint.pprint(data["network"])
 
-        # Loop through all the interfaces in /etc/sysconfig/network-scripts/
-        for file_key, file_value in data['file'].items():
-            if file_key.startswith('/etc/sysconfig/network-scripts/ifcfg-') and 'content' in file_value:
-                interface_info = {
-                    'interface': file_key.split('/')[-1],  # Get interface name
-                    'HWADDR': None,
-                    'IPADDR': None,
-                    'IPV6ADDR': None
-                }
-                eth_content = file_value['content']
-                for key, value in eth_content.items():
+        return hostname, network_hostname, bmc_address, interfaces
+    elif os_version == 'centos_8' or os_version == 'centos_9':
+        # print("CentOS 8/9 data")
+        # if 'file' in data:
+        #     pprint.pprint({k:v for (k,v) in data["file"].items() if '/etc/sysconfig/network-scripts' in k})
+
+        if 'bmc' in data and 'lan' in data['bmc'] and 'ip_address' in data['bmc']['lan']:
+            bmc_address = data['bmc']['lan']['ip_address']
+        
+        if 'file' in data:
+            if '/etc/hostname' in data['file'] and 'content' in data['file']['/etc/hostname']:
+                hostname_content = data['file']['/etc/hostname']['content']
+                for key, value in hostname_content.items():
+                    if isinstance(value, dict):
+                        for host, flag in value.items():
+                            if flag:  # Check if it's set to True
+                                hostname = host
+            if '/etc/sysconfig/network' in data['file'] and 'content' in data['file']['/etc/sysconfig/network']:
+                network_content = data['file']['/etc/sysconfig/network']['content']
+                for key, value in network_content.items():
                     if isinstance(value, dict):
                         for network_config, flag in value.items():
-                            if flag and network_config.startswith("HWADDR="):
-                                interface_info['HWADDR'] = network_config.split('=')[1]
-                            if flag and network_config.startswith("IPADDR="):
-                                interface_info['IPADDR'] = network_config.split('=')[1]
-                            if flag and network_config.startswith("IPV6ADDR="):
-                                interface_info['IPV6ADDR'] = network_config.split('=')[1]
-                interfaces.append(interface_info)
-    return hostname, network_hostname, bmc_address, interfaces
+                            if flag and network_config.startswith("HOSTNAME="):
+                                network_hostname = network_config.split('=')[1]
+
+            # Loop through all the interfaces in /etc/sysconfig/network-scripts/
+            for file_key, file_value in data['file'].items():
+                if file_key.startswith('/etc/sysconfig/network-scripts/ifcfg-') and 'content' in file_value:
+                    interfacename = file_key.removeprefix('/etc/sysconfig/network-scripts/ifcfg-')  # Get interface name, removeprefix() behavior is kinda weird but this should work
+
+                    interface_info = {
+                        'interface': file_key.split('/')[-1], #keeping this for parity checks
+                        'HWADDR': None,
+                        'IPADDR': None,
+                        'IPV6ADDR': None
+                    }
+                    eth_content = file_value['content']
+                    for key, value in eth_content.items():
+                        if isinstance(value, dict):
+                            for network_config, flag in value.items():
+                                if flag and network_config.startswith("HWADDR="):
+                                    interface_info['HWADDR'] = network_config.split('=')[1]
+                                if flag and network_config.startswith("IPADDR="):
+                                    interface_info['IPADDR'] = network_config.split('=')[1]
+                                if flag and network_config.startswith("IPV6ADDR="):
+                                    interface_info['IPV6ADDR'] = network_config.split('=')[1]
+                    interfaces[interfacename] = interface_info
+        return hostname, network_hostname, bmc_address, interfaces
+    else:
+        print(f"Unknown OS version {os_version}")
+        return None, None, None, None
 
 #this gets the chassis for the node and if it is a vm 
-def get_node_chassis_and_vm(node_chassis_path:str) -> (str, bool):
+def get_node_chassis_and_vm(node_chassis_path:str) -> Tuple[str, bool]:
     templatename = os.path.basename(os.path.realpath(node_chassis_path))
     #not using YAML_TO_PROPERTIES b/c the chassis yaml names should hopefully match (this may change)
     return (os.path.splitext(templatename)[0], templatename == 'kvm_guest.yaml')
@@ -92,7 +113,7 @@ def get_node_os(node_os_path:str) -> str:
         return None
     return YAML_TO_PROPERTIES[templatename]
 
-def load_yaml_files(puppet_data_path):
+def load_yaml_files(puppet_data_path: str) -> dict:
     nodes_data = {}
     for filename in os.listdir(os.path.join(puppet_data_path, 'node')):
         
@@ -105,18 +126,46 @@ def load_yaml_files(puppet_data_path):
                 content = stream.read()
                 content = preprocess_yaml_content(content)
                 try:
+                    hostname = os.path.basename(os.path.realpath(filepath)).removesuffix('.yaml') #we need the fqdn for hostname
+                    
                     data = yaml.safe_load(content)
-                    hostname, network_hostname, bmc_address, interfaces = find_nodefile_info(data)
-                    nodes_data[filename] = {  #TODO: entries should be created even if yaml.safe_load of find_nodefile_info fails
-                        'hostname': hostname,
-                        'network_hostname': network_hostname,
-                        'bmc_address': bmc_address,
-                        'interfaces': interfaces
-                    }
 
-                    nodes_data[filename]['chassis'], nodes_data[filename]['isVM'] = get_node_chassis_and_vm(os.path.join(puppet_data_path, 'chassis', filename)) #this should be in the outside loop, but sometimes the entry for the host is not created
+                    nodes_data[hostname] = {}
 
-                    nodes_data[filename]['os_version'] = get_node_os(os.path.join(puppet_data_path, 'os_tier_1', filename))
+                    nodes_data[hostname]['chassis'], nodes_data[hostname]['isVM'] = get_node_chassis_and_vm(os.path.join(puppet_data_path, 'chassis', filename)) #this should be in the outside loop, but sometimes the entry for the host is not created
+                    nodes_data[hostname]['os_version'] = get_node_os(os.path.join(puppet_data_path, 'os_tier_1', filename))
+
+                    name, network_hostname, bmc_address, interfaces = find_nodefile_info(data, nodes_data[hostname]['os_version'])
+                    if (name is not None and not (name == hostname.split('.')[0] or name == hostname)): # make sure name isn't none, and that name isn't just the hostname or the fqdn
+                        print(f"Hostname mismatch: {name} != {hostname}")
+                    
+                    nodes_data[hostname]['hostname'] = hostname
+                    nodes_data[hostname]['network_hostname'] = network_hostname
+                    nodes_data[hostname]['bmc_address'] = bmc_address
+                    nodes_data[hostname]['interfaces'] = interfaces #keep for parity checks
+                    
+                    # Add interfaces to the node data
+                    # Only add the most relevant interface
+                    nodes_data[hostname]["mac_address"] = ""
+                    nodes_data[hostname]["ipv4_address"] = ""
+                    # nodes_data[hostname]["netmask"] = ""
+                    # nodes_data[hostname]["gateway"] = ""
+                    nodes_data[hostname]["ipv6_address"] = ""
+                    if interfaces is not None and len(interfaces) > 0: #only do this if we actually have an interface to look at
+                        for ifkey in list(interfaces.keys()) + ["em1", "eth0", "ib0"]: #make sure we do some specific interfaces last TODO: get help on which interface provides the "real" address
+                            if ifkey not in interfaces:
+                                continue
+
+                            for nodedictkey, ifdictkey in [('mac_address', 'HWADDR'), ('ipv4_address', 'IPADDR'), ('ipv6_address', 'IPV6ADDR')]:
+                                if interfaces[ifkey][ifdictkey] is not None and interfaces[ifkey][ifdictkey] != "":
+
+                                    nodes_data[hostname][nodedictkey] = interfaces[ifkey][ifdictkey]
+                            # nodes_data[hostname]["mac_address"] = if interfaces[ifkey]['HWADDR'] is None else interfaces[ifkey]['HWADDR'].upper()
+                            # nodes_data[hostname]["ipv4_address"] = interfaces[ifkey]['IPADDR']
+                            # # nodes_data[hostname]["netmask"] = interfaces[ifkey]['netmask']
+                            # # nodes_data[hostname]["gateway"] = interfaces[ifkey]['if_gateway']
+                            # nodes_data[hostname]["ipv6_address"] = interfaces[ifkey]['IPV6ADDR']
+
                 except yaml.YAMLError as e:
                     print(f"Error parsing YAML file {filepath}: {e}")
     return nodes_data
@@ -129,13 +178,22 @@ def perform_parity_checks(nodes_data):
     failed_checks = []
     for node, info in nodes_data.items():
         # Check for duplicate BMC addresses
+        # print("====================================")
+        # print(node)
+        # print(info)
+        
+        if (info is None or len(info) == 0):
+            print(f"Node {node} has no data.")
+            continue
+
         if info['bmc_address']:
             if info['bmc_address'] in bmc_addresses:
                 failed_checks.append(f"Duplicate BMC address detected: {info['bmc_address']} in node {node}")
             else:
                 bmc_addresses.add(info['bmc_address'])
-        
-        for interface in info['interfaces']:
+        if (info['interfaces'] is None or len(info['interfaces']) == 0):
+            continue
+        for interface in info['interfaces'].values():
             # Check for duplicate IPv4/IPv6 addresses
             if interface['IPADDR']:
                 if interface['IPADDR'] in ipv4_addresses:
@@ -165,7 +223,7 @@ def puppet_to_dict(puppet_data_path:str = "../puppet_data") -> dict:
 
 
 if __name__ == "__main__":
-    puppet_data_path = '../puppet_data'
+    puppet_data_path = '../puppet_data' #TODO: change this back to '../puppet_data' when done testing
     #run this if called through command line
     if len(sys.argv) == 1:
         pass
@@ -185,3 +243,5 @@ if __name__ == "__main__":
             print(failure)
     else:
         print("All parity checks passed.")
+
+    #pprint.pprint(nodes_data) #print everything

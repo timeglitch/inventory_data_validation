@@ -14,6 +14,9 @@ if not os.path.exists('cobbler_objects'):
 
 #TODO: maybe rsync to make sure the files are up to date?
 
+
+#pass in a cobbler profile, returns the OS version
+#returns "unknown"
 def profile_to_os(profile:str) -> str:
     if 'CentOS_7' in profile:
         return "centos_7"
@@ -22,8 +25,8 @@ def profile_to_os(profile:str) -> str:
     elif 'CentOS_9' in profile:
         return "centos_9"
     else:
-        print(f"Unknown OS for Cobbler profile {profile}") #Debug statement
-        return f"Unknown OS for Cobbler profile {profile}"
+        #print(f"Unknown OS for Cobbler profile {profile}") #Debug statement
+        return "" 
 
 #pass in the loaded json, returns (ip_address, netmask, gateway, mac_address)
 def get_networking_info(data:dict) -> (str, str, str, str):
@@ -74,9 +77,12 @@ def cobbler_to_dict(redownload_files:bool=False) -> dict:
                     if file.removesuffix('.json') != data['hostname']:
                         print(f'Filename "{file}" does not match hostname entry "{data["hostname"]}"') #TODO: return this data more intelligently?
                     else:
-                        print(f'Loaded {file} into dictionary')
+                        pass #print(f'Loaded {file} into dictionary')
                     db[hostname] = {}
                     db[hostname]["profile"] = data['profile']
+                    if "dummy" in data['profile']:
+                        print(f'Unknown profile for {hostname}: {data["profile"]}')
+
                     db[hostname]["os_version"] = profile_to_os(data['profile'])
 
                     db[hostname]["ipv4_address"], db[hostname]["netmask"], db[hostname]["gateway"], db[hostname]["mac_address"] = get_networking_info(data) 
@@ -101,7 +107,7 @@ def cobbler_to_dict(redownload_files:bool=False) -> dict:
             print(f'{file} is not a json file')
     return db
 
-#example entry looks like this:
+#example cobbler entry looks like this:
 """
 {'boot_files': {},
  'comment': '',
@@ -176,14 +182,12 @@ def cobbler_to_dict(redownload_files:bool=False) -> dict:
  'virt_ram': '<<inherit>>',
  'virt_type': 'xenpv'}
 """
+
 #call the functions if this script is run directly
-
-
-if len(sys.argv) != 1:
-    print('Usage: python3 cobbler_data.py')
-    print('This script copies cobbler_objects from cobbler.chtc.wisc.edu and loads the json files into a dictionary')
-    sys.exit(1)
-
-
-db = cobbler_to_dict()
-pprint.pprint(db[next(iter(db))])
+if __name__ == "__main__":
+    if len(sys.argv) != 1:
+        print('Usage: python3 cobbler_data.py')
+        print('This script copies cobbler_objects from cobbler.chtc.wisc.edu and loads the json files into a dictionary')
+        sys.exit(1)
+    db = cobbler_to_dict()
+    pprint.pprint(db[next(iter(db))])

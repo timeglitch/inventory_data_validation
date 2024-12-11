@@ -81,7 +81,7 @@ def cobbler_to_dict(redownload_files:bool=False) -> dict:
 
                     db[hostname]["ipv4_address"], db[hostname]["netmask"], db[hostname]["gateway"], db[hostname]["mac_address"] = get_networking_info(data) 
 
-
+                    #TODO: ipv6
                     
                 except json.JSONDecodeError as e:
                     print(f'JSONDecodeError loading {file}: {e}')

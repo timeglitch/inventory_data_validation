@@ -26,10 +26,8 @@ YAML_TO_PROPERTIES = {
 def preprocess_yaml_content(content):
     # Replace tabs with 4 spaces
     content = content.replace('\t', '    ')
-    
     # Handle improperly escaped single quotes in double-quoted scalars
     content = content.replace("\\'", "'")
-    
     return content
 
 def find_nodefile_info(data): #TODO: this only works for centos 8/9
@@ -166,24 +164,24 @@ def puppet_to_dict(puppet_data_path:str = "../puppet_data") -> dict:
 
 
 
-puppet_data_path = '../puppet_data'
-
-#run this if called through command line
-if len(sys.argv) == 1:
-    pass
-elif len(sys.argv) == 2:
-    if sys.argv[1] == '-h' or sys.argv[1] == '--help':
-        print('Usage: python3 puppet_data.py [path_to_puppet_data]')
-        print('This script loads the json files in the puppet_data repository into a dictionary')
-        sys.exit(0)
+if __name__ == "__main__":
+    puppet_data_path = '../puppet_data'
+    #run this if called through command line
+    if len(sys.argv) == 1:
+        pass
+    elif len(sys.argv) == 2:
+        if sys.argv[1] == '-h' or sys.argv[1] == '--help':
+            print('Usage: python3 puppet_data.py [path_to_puppet_data]')
+            print('This script loads the json files in the puppet_data repository into a dictionary')
+            sys.exit(0)
+        else:
+            puppet_data_path = sys.argv[1]
+    # Running this file with no args will run the parity checks
+    nodes_data = load_yaml_files(puppet_data_path)
+    parity_check_results = perform_parity_checks(nodes_data)
+    if parity_check_results:
+        print("Parity Check Failures:")
+        for failure in parity_check_results:
+            print(failure)
     else:
-        puppet_data_path = sys.argv[1]
-# Running this file with no args will run the parity checks
-nodes_data = load_yaml_files(puppet_data_path)
-parity_check_results = perform_parity_checks(nodes_data)
-if parity_check_results:
-    print("Parity Check Failures:")
-    for failure in parity_check_results:
-        print(failure)
-else:
-    print("All parity checks passed.")
+        print("All parity checks passed.")

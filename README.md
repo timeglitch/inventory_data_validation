@@ -21,7 +21,7 @@ This repository contains scripts and tools for validating inventory data. The go
 1. Place your asset_data and puppet_data in the same directory as this repository (TODO: implement specifying path in command line)
 2. Run the validation script:
     ```sh
-    python3 validate_inventory.py
+    python3 main.py
     ```
 3. Check the output for any validation errors.
 

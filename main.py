@@ -29,7 +29,7 @@ def main():
     puppet_cobbler_ipv4_mismatch = []
     print("Puppet and Cobbler IPv4 Mismatch:")
     for host in puppet_hosts & cobbler_hosts:
-        if puppet_db[host]['ipv4_address'] != cobbler_db[host]['ipv4_address']:
+        if puppet_db[host]['ipv4_address'].lower() != cobbler_db[host]['ipv4_address'].lower():
             puppet_cobbler_ipv4_mismatch.append([host, puppet_db[host]['ipv4_address'], cobbler_db[host]['ipv4_address']])
             #print(f"{host}: puppet {puppet_db[host]['ipv4_address']} cobbler {cobbler_db[host]['ipv4_address']}")
     print(tabulate.tabulate(puppet_cobbler_ipv4_mismatch, headers=["Host", "Puppet IPv4", "Cobbler IPv4"]))
@@ -37,7 +37,7 @@ def main():
     puppet_cobbler_mac_mismatch = []
     print("Puppet and Cobbler MAC Mismatch:")
     for host in puppet_hosts & cobbler_hosts:
-        if puppet_db[host]['mac_address'] != cobbler_db[host]['mac_address']:
+        if puppet_db[host]['mac_address'].lower() != cobbler_db[host]['mac_address'].lower():
             puppet_cobbler_mac_mismatch.append([host, puppet_db[host]['mac_address'], cobbler_db[host]['mac_address']])
             #print(f"{host}: puppet {puppet_db[host]['mac_address']} cobbler {cobbler_db[host]['mac_address']}")
     print(tabulate.tabulate(puppet_cobbler_mac_mismatch, headers=["Host", "Puppet MAC", "Cobbler MAC"]))

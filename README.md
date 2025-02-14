@@ -1,12 +1,12 @@
 # Inventory Data Validation
 
-This repository contains scripts and tools for validating inventory data. The goal is to ensure that the data is accurate, consistent, and complete before it is used in any downstream processes.
+This repository contains scripts and tools for validating inventory, cobbler, and puppet data. The goal is to ensure that the data is accurate, consistent, and complete before it is used in any downstream processes.
 
 ## Features
 
 - **Data Integrity Checks**: Verify that the data meets predefined integrity constraints.
-- **Consistency Checks**: Ensure that the data is consistent across different datasets.
 - **Completeness Checks**: Confirm that all required data fields are populated.
+- **Consistency Checks**: Ensure that the data is consistent across different datasets.
 
 ## Getting Started
 
@@ -23,8 +23,6 @@ This repository contains scripts and tools for validating inventory data. The go
     ```sh
     python3 main.py
     ```
-3. Check the output for any validation errors.
+3. Check the output for any cross-validation errors.
 
-### TODO:
- - puppet_data_formatter does not read el7 nodefiles
- - how are we going to present the data?
+The main script compares data from all three sources.  Each of the individual (asset, cobbler, puppet) runs different checks for validity and completeness on its own source.

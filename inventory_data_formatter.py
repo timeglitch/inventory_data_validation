@@ -6,6 +6,18 @@ asset_data_path = "../asset_data"
 
 #Couldn't figure out how to import yaml_io so I'm just manually reading the yamls
 
+VALID_BUILDINGS = set(["Computer Sciences", "WID", "OneNeck", "Syracuse", "UNL", "FIU", "MISSING"])
+VALID_ROOMS = {
+    "Computer Sciences": set(["CS2360", "CSB240", "CS3370a"]),
+    "WID": set(["WID"]),
+    "OneNeck": set(["OneNeck"]),
+    "Syracuse": set(["Syracuse"]),
+    "UNL": set(["UNL"]),
+    "FIU": set(["FIU"]),
+    "MISSING": set(["MISSING"]),
+
+}
+
 #replaces invalid characters in the yaml files with valid ones
 def preprocess_yaml_content(content: str) -> str:
     # Replace tabs with 4 spaces
@@ -42,7 +54,9 @@ def inventory_to_dict(inventory_repository_path:str = "../asset_data") -> dict:
                     db[hostname] = {}
                     db[hostname]["hostname"] = hostname #To comply with common data format
                     db[hostname]["chassis"] = data['hardware']['model']
-                    db[hostname]["location"] = data['location']['building']
+                    db[hostname]["location"] = data['location']['building'] + ", " + data['location']['room']
+                    db[hostname]["building"] = data['location']['building']
+                    db[hostname]["room"] = data['location']['room']
 
                     #db[hostname] = data #Debug line to show raw data
                 except yaml.YAMLError as e:
@@ -51,6 +65,17 @@ def inventory_to_dict(inventory_repository_path:str = "../asset_data") -> dict:
 
     return db
 
+def validate_location_data(db: dict) -> list[(str, str)]: #list of tuples of hostname and error message
+    for hostname, data in db.items():
+        building = data['building']
+        if building not in VALID_BUILDINGS:
+            list.append((hostname, f"Invalid building for {hostname}: {building}"))
+            print(f"Invalid building for {hostname}: {building}")
+        room = data['room']
+        if room not in VALID_ROOMS[building]:
+            list.append((hostname, f"Invalid room for {hostname}: {building} {room}"))
+            print(f"Invalid room for {hostname}: {building} {room}")
+
 #call the functions if this script is run directly
 if __name__ == "__main__":
     if len(sys.argv) != 1:
@@ -58,5 +83,8 @@ if __name__ == "__main__":
         print('This script loads the json files in the inventory_data repository into a dictionary')
         sys.exit(1)
     db = inventory_to_dict()
-    pprint.pprint(db) #print the first 5 keys in the dictionary
+
+    locationerrors = validate_location_data(db)        
+
+    #pprint.pprint(db) #print the first 5 keys in the dictionary
     

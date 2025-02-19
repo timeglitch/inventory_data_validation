@@ -26,7 +26,7 @@ def profile_to_os(profile:str) -> str:
         return "centos_9"
     else:
         #print(f"Unknown OS for Cobbler profile {profile}") #Debug statement
-        return "" 
+        return "unknown - " + profile
 
 #pass in the loaded json, returns (ip_address, netmask, gateway, mac_address)
 def get_networking_info(data:dict) -> (str, str, str, str):

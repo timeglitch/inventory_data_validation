@@ -17,12 +17,24 @@ import yaml
 import sys
 import pprint
 from typing import Tuple
+
 #convert the file names to the actual property name
 YAML_TO_PROPERTIES = {
     "centos_7.yaml": "centos_7",
     "centos_8_stream.yaml": "centos_8",
     "centos_9_stream.yaml": "centos_9",
     "centos.yaml" : "centos - This is the base yaml, this shouldn\'t happen",
+    #location property names are in the format: "BUILDING, ROOM".  If there is no room, it is "BUILDING, BUILDING"
+    "cs_2360.yaml" : "Computer Sciences, CS2360",
+    "cs_3370a.yaml" : "Computer Sciences, CS3370a",
+    "cs_b240.yaml" : "Computer Sciences, CSB240",
+    "oneneck.yaml" : "OneNeck, OneNeck",
+    "path_fiu.yaml" : "FIU, FIU",
+    "path_syra.yaml" : "Syracuse, Syracuse", #syra seems to be in syracuse
+    "path_syrb.yaml" : "Computer Sciences, CS2360", #syrb seems to be in cs2360
+    "path_unl.yaml" : "UNL, UNL",
+    "path_wisc.yaml" : "Computer Sciences, CS2360", #TODO: it appears they live in cs2360
+    "wid.yaml" : "WID, WID",
 }
 
 def preprocess_yaml_content(content: str) -> str:
@@ -37,16 +49,61 @@ from typing import List
 #this function takes the dict of a nodefile and extracts the hostname, network hostname, bmc address, and interfaces
 #interfaces are returned in a dict with key = interface name (e.g. eth0) and value = dict of HWADDR, IPADDR, IPV6ADDR
 def find_nodefile_info(data: dict, os_version: str) -> Tuple[str, str, str, dict]: #this function is super ugly, maybe refactor
-    hostname = None
+    hostname = None             #hostname and network hostname are currently unused for centos7, just a bonus validation
     network_hostname = None
     bmc_address = None
     interfaces = {}
 
-    if os_version == 'centos_7':
-        # print("CentOS 7 data['network']")
-        # pprint.pprint(data["network"])
+    if os_version == 'centos_7': #
+        # print("\nCentOS 7 data['network']:")
+        # pprint.pprint(data['network'])
+        
+        if 'network' not in data:
+            #print("=============== No network data found in CentOS 7 node file.") #this isn't suprising if we have: {materialize: false}, so we don't print this message
+            return None, None, None, None
+        if 'if_bridge' not in data['network']:
+            print("=============== No if_bridge data found in CentOS 7 node file.")
+            return None, None, None, None
+        if 'eth0' not in data['network']['if_bridge']:
+            print("=============== No eth0 data found in CentOS 7 node file, interfaces are: " + str(data['network'].keys()))
+            return None, None, None, None
+        if 'bridge_static' not in data['network']:
+            print("=============== No bridge_static data found in CentOS 7 node file.")
+            return None, None, None, None
+        if 'br0' not in data['network']['bridge_static']:
+            print("=============== No br0 data found in CentOS 7 node file.")
+            return None, None, None, None
+        
+        if 'bmc' in data and 'lan' in data['bmc'] and 'ip_address' in data['bmc']['lan']:
+            bmc_address = data['bmc']['lan']['ip_address']
 
+        interface_info = {
+            'interface': 'eth0', #eth0 is the only interface we care about for centos7 (TODO: check to make sure this is true)
+            'HWADDR': None,
+            'IPADDR': None,
+            'IPV6ADDR': None
+        }
+
+        if data['network']['if_bridge']['eth0']: #if eth0 is a dictionary with a value
+            if data['network']['if_bridge']['eth0'] and 'macaddress' in data['network']['if_bridge']['eth0']:
+                interface_info['HWADDR'] = data['network']['if_bridge']['eth0'].get('macaddress') #dict.get(key) returns None if key doesn't 
+                
+            if data['network']['bridge_static']['br0'] and 'ipaddress' in data['network']['bridge_static']['br0']:
+                interface_info['IPADDR'] = data['network']['bridge_static']['br0'].get('ipaddress')
+
+            if data['network']['bridge_static']['br0'] and 'ipv6address' in data['network']['bridge_static']['br0']:
+                interface_info['IPV6ADDR'] = data['network']['bridge_static']['br0'].get('ipv6address')
+        else: #if eth0 is false or null, meaning that data probably exists in a bond_bridge
+            pass
+            #TODO: get the data from the bond_bridge
+
+
+
+
+        interfaces['eth0'] = interface_info
+        
         return hostname, network_hostname, bmc_address, interfaces
+
     elif os_version == 'centos_8' or os_version == 'centos_9':
         # print("CentOS 8/9 data")
         # if 'file' in data:
@@ -101,8 +158,10 @@ def find_nodefile_info(data: dict, os_version: str) -> Tuple[str, str, str, dict
 #this gets the chassis for the node and if it is a vm 
 def get_node_chassis_and_vm(node_chassis_path:str) -> Tuple[str, bool]:
     templatename = os.path.basename(os.path.realpath(node_chassis_path))
+    if ".chtc.wisc.edu" in templatename: #if the file is not a symlink, then return false
+        return ("unknown", False)
     #not using YAML_TO_PROPERTIES b/c the chassis yaml names should hopefully match (this may change)
-    return (os.path.splitext(templatename)[0], templatename == 'kvm_guest.yaml')
+    return ("vm" if templatename == 'kvm_guest.yaml' else os.path.splitext(templatename)[0], templatename == 'kvm_guest.yaml')
 
 #given the path to a node in os_tier_1, return the centos version of the node
 def get_node_os(node_os_path:str) -> str:
@@ -110,6 +169,14 @@ def get_node_os(node_os_path:str) -> str:
 
     if templatename not in YAML_TO_PROPERTIES:
         print(f'Unknown OS template name {templatename} for node {node_os_path}') #don't know why this ever gets printed out
+        return None
+    return YAML_TO_PROPERTIES[templatename]
+
+def get_node_site(node_site_path:str) -> str:
+    templatename = os.path.basename(os.path.realpath(node_site_path)) #extract the file name
+
+    if templatename not in YAML_TO_PROPERTIES:
+        print(f'Unknown Site name {templatename} for node {node_site_path}') #don't know why this ever gets printed out
         return None
     return YAML_TO_PROPERTIES[templatename]
 
@@ -129,11 +196,14 @@ def load_yaml_files(puppet_data_path: str) -> dict:
                     hostname = os.path.basename(os.path.realpath(filepath)).removesuffix('.yaml') #we need the fqdn for hostname
                     
                     data = yaml.safe_load(content)
+                    #print(f"Processing {hostname}")
 
                     nodes_data[hostname] = {}
 
-                    nodes_data[hostname]['chassis'], nodes_data[hostname]['isVM'] = get_node_chassis_and_vm(os.path.join(puppet_data_path, 'chassis', filename)) #this should be in the outside loop, but sometimes the entry for the host is not created
+                    nodes_data[hostname]['chassis'], nodes_data[hostname]['isVM'] = get_node_chassis_and_vm(os.path.join(puppet_data_path, 'chassis_tier_0', filename)) #this should be in the outside loop, but sometimes the entry for the host is not created
                     nodes_data[hostname]['os_version'] = get_node_os(os.path.join(puppet_data_path, 'os_tier_1', filename))
+                    
+                    nodes_data[hostname]['location'] = get_node_site(os.path.join(puppet_data_path, 'site_tier_0', filename)) #the location key is used to compare against inventory
 
                     name, network_hostname, bmc_address, interfaces = find_nodefile_info(data, nodes_data[hostname]['os_version'])
                     if (name is not None and not (name == hostname.split('.')[0] or name == hostname)): # make sure name isn't none, and that name isn't just the hostname or the fqdn

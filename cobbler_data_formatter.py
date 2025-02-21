@@ -5,15 +5,12 @@ import pprint
 import sys
 
 
-#copies the cobbler_objects directory from cobbler.chtc.wisc.edu
-def get_cobbler_objects():
+def get_cobbler_objects(): #copies the cobbler_objects directory from cobbler.chtc.wisc.edu
     os.system('scp -r cobbler.chtc.wisc.edu:/var/lib/cobbler/config/systems.d cobbler_objects')
+
 #first check that cobbler_objects exists, if not scp from cobbler.chtc.wisc.edu
 if not os.path.exists('cobbler_objects'):
-    os.system('scp -r cobbler.chtc.wisc.edu:/var/lib/cobbler/config/systems.d cobbler_objects')
-
-#TODO: maybe rsync to make sure the files are up to date?
-
+    get_cobbler_objects()
 
 #pass in a cobbler profile, returns the OS version
 #returns "unknown"
@@ -29,7 +26,7 @@ def profile_to_os(profile:str) -> str:
         return "unknown - " + profile
 
 #pass in the loaded json, returns (ip_address, netmask, gateway, mac_address)
-def get_networking_info(data:dict) -> (str, str, str, str):
+def get_networking_info(data:dict) -> tuple[str, str, str, str]:
 
     if len(data['interfaces']) == 0:
         return ("", "", "", "")
@@ -183,7 +180,9 @@ def cobbler_to_dict(redownload_files:bool=False) -> dict:
  'virt_type': 'xenpv'}
 """
 
+
 #call the functions if this script is run directly
+#cobbler doesn't really have anything to validate, so we just print the dictionary
 if __name__ == "__main__":
     if len(sys.argv) != 1:
         print('Usage: python3 cobbler_data.py')

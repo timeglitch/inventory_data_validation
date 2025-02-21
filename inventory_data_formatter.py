@@ -4,7 +4,7 @@ import yaml
 import pprint
 asset_data_path = "../asset_data"
 
-#Couldn't figure out how to import yaml_io so I'm just manually reading the yamls
+#Couldn't figure out how to import yaml_io from the asset repository so I'm just manually reading the yamls
 
 VALID_BUILDINGS = set(["Computer Sciences", "WID", "OneNeck", "Syracuse", "UNL", "FIU", "MISSING"])
 VALID_ROOMS = {
@@ -17,6 +17,8 @@ VALID_ROOMS = {
     "MISSING": set(["MISSING"]),
 
 }
+
+
 
 #replaces invalid characters in the yaml files with valid ones
 def preprocess_yaml_content(content: str) -> str:
@@ -84,7 +86,7 @@ if __name__ == "__main__":
         sys.exit(1)
     db = inventory_to_dict()
 
-    locationerrors = validate_location_data(db)        
+    locationerrors = validate_location_data(db)
 
     #pprint.pprint(db) #print the first 5 keys in the dictionary
     
